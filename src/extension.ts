@@ -1,27 +1,81 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+const myProvider = new (class implements vscode.CustomTextEditorProvider {
+  private updateTextDocument(document: vscode.TextDocument, text: string) {
+    const edit = new vscode.WorkspaceEdit();
+
+    // Just replace the entire document every time for this example extension.
+    // A more complete extension should compute minimal edits instead.
+    edit.replace(
+      document.uri,
+      new vscode.Range(0, 0, document.lineCount, 0),
+      text
+    );
+
+    return vscode.workspace.applyEdit(edit);
+  }
+
+  public async resolveCustomTextEditor(
+    document: vscode.TextDocument,
+    webviewPanel: vscode.WebviewPanel,
+    _token: vscode.CancellationToken
+  ): Promise<void> {
+    webviewPanel.webview.options = {
+      enableScripts: true,
+    };
+    webviewPanel.webview.onDidReceiveMessage(({
+      type, payload
+    }) => {
+      switch (type) {
+        case 'update':
+          this.updateTextDocument(document, payload)
+          break;
+
+        default:
+          break;
+      }
+    })
+    webviewPanel.webview.html = `
+<html>
+  <head>
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'self' https://cdn.jsdelivr.net;
+      script-src 'unsafe-inline' ${
+        webviewPanel.webview.cspSource
+      } https://cdn.jsdelivr.net;
+      style-src https://maxcdn.bootstrapcdn.com https://cdn.jsdelivr.net ${
+        webviewPanel.webview.cspSource
+      };
+      font-src https://cdn.jsdelivr.net https://maxcdn.bootstrapcdn.com;
+      img-src *;"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+  </head>
+  <body>
+    <textarea>${document.getText()}</textarea>
+    <script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+    <script>
+      const simplemde = new SimpleMDE({
+        showIcons: ["code", "table"],
+      });
+      const vscode = acquireVsCodeApi();
+
+      simplemde.codemirror.on("change", function(){
+        vscode.postMessage({
+          type: 'update',
+          payload: simplemde.value()
+        })
+      });
+    </script>
+  </body>
+</html>`;
+  }
+})();
+
 export function activate(context: vscode.ExtensionContext) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "markdown-editor" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('markdown-editor.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from Markdown Editor!');
-	});
-
-	context.subscriptions.push(disposable);
+  context.subscriptions.push(
+    vscode.window.registerCustomEditorProvider('md.md', myProvider)
+  );
 }
 
-// this method is called when your extension is deactivated
 export function deactivate() {}

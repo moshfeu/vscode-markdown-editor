@@ -2,7 +2,7 @@
   "name": "markdown-editor",
 	"displayName": "Markdown Editor",
 	"description": "Wysiwyg Markdown Editor - StackEdit wrapper",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"engines": {
 		"vscode": "^1.53.0"
 	},
@@ -10,16 +10,24 @@
 		"Other"
 	],
 	"activationEvents": [
-        "onCommand:markdown-editor.helloWorld"
+    "*"
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
-		"commands": [
-			{
-				"command": "markdown-editor.helloWorld",
-				"title": "Hello World"
-			}
-		]
+    "customEditors": [
+      {
+        "viewType": "md.md",
+        "displayName": "Markdown Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.mdx"
+          }
+        ]
+      }
+    ]
 	},
 	"scripts": {
 		"vscode:prepublish": "yarn run package",
