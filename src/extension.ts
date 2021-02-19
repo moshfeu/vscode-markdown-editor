@@ -30,7 +30,12 @@ const myProvider = new (class implements vscode.CustomTextEditorProvider {
         case 'update':
           this.updateTextDocument(document, payload)
           break;
-
+        case 'ready':
+          webviewPanel.webview.postMessage({
+            type: 'init',
+            payload: document.getText()
+          })
+          break;
         default:
           break;
       }
@@ -39,36 +44,66 @@ const myProvider = new (class implements vscode.CustomTextEditorProvider {
 <html>
   <head>
     <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self' https://cdn.jsdelivr.net;
+      content="default-src 'self' https://uicdn.toast.com;
       script-src 'unsafe-inline' ${
         webviewPanel.webview.cspSource
-      } https://cdn.jsdelivr.net;
-      style-src https://maxcdn.bootstrapcdn.com https://cdn.jsdelivr.net ${
+      } https://uicdn.toast.com;
+      style-src https://uicdn.toast.com https://cdnjs.cloudflare.com ${
         webviewPanel.webview.cspSource
-      };
-      font-src https://cdn.jsdelivr.net https://maxcdn.bootstrapcdn.com;
-      img-src *;"
+      } unsafe-inline;
+      font-src https://uicdn.toast.com;
+      frame-src http: https:;
+      img-src * data:;"
     />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.48.4/codemirror.min.css" />
+    <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
   </head>
   <body>
-    <textarea>${document.getText()}</textarea>
-    <script src="https://cdn.jsdelivr.net/simplemde/latest/simplemde.min.js"></script>
+    <div id="editor"></div>
+    <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
     <script>
-      const simplemde = new SimpleMDE({
-        showIcons: ["code", "table"],
-      });
       const vscode = acquireVsCodeApi();
-
-      simplemde.codemirror.on("change", function(){
-        vscode.postMessage({
-          type: 'update',
-          payload: simplemde.value()
-        })
+      const Editor = toastui.Editor;
+      const editor = new Editor({
+        usageStatistics: false,
+        el: document.querySelector('#editor'),
+        height: 'auto',
+        initialEditType: 'wysiwyg',
+        customHTMLSanitizer: html => html,
       });
+      // unshadow "save"
+      editor.getSquire().setKeyHandler('ctrl-s', null);
+      window.addEventListener('message', (({data: {type, payload}}) => {
+        switch (type) {
+          case 'init':
+            init(payload);
+            break;
+        }
+      }));
+
+      vscode.postMessage({
+        type: 'ready'
+      });
+
+      let first = true;
+      function init(payload) {
+        editor.setMarkdown(payload);
+        editor.on('change', () => {
+          // annoying
+          if (first) {
+            first = false;
+            return;
+          }
+          vscode.postMessage({
+            type: 'update',
+            payload: editor.getMarkdown()
+          })
+        })
+      }
     </script>
   </body>
-</html>`;
+</html>
+`;
   }
 })();
 
