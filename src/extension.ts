@@ -34,13 +34,15 @@ const myProvider = new (class implements vscode.CustomTextEditorProvider {
           webviewPanel.webview.postMessage({
             type: 'init',
             payload: document.getText()
-          })
+          });
           break;
+        case 'save':
+          vscode.window.activeTextEditor?.document.save();
         default:
           break;
       }
     })
-    webviewPanel.webview.html = `
+    webviewPanel.webview.html = /*html*/`
 <html>
   <head>
     <meta http-equiv="Content-Security-Policy"
@@ -63,16 +65,17 @@ const myProvider = new (class implements vscode.CustomTextEditorProvider {
     <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
     <script>
       const vscode = acquireVsCodeApi();
-      const Editor = toastui.Editor;
+      const {Editor} = toastui;
       const editor = new Editor({
         usageStatistics: false,
         el: document.querySelector('#editor'),
         height: 'auto',
+        // previewStyle: 'tab',
         initialEditType: 'wysiwyg',
         customHTMLSanitizer: html => html,
       });
       // unshadow "save"
-      editor.getSquire().setKeyHandler('ctrl-s', null);
+      // editor.getSquire().setKeyHandler('ctrl-s', null);
       window.addEventListener('message', (({data: {type, payload}}) => {
         switch (type) {
           case 'init':
@@ -88,18 +91,33 @@ const myProvider = new (class implements vscode.CustomTextEditorProvider {
       let first = true;
       function init(payload) {
         editor.setMarkdown(payload);
+        let prevContent = '';
         editor.on('change', () => {
           // annoying
           if (first) {
             first = false;
             return;
           }
+          const newContent = editor.getMarkdown();
+          if (newContent === prevContent) {
+            return;
+          }
           vscode.postMessage({
             type: 'update',
-            payload: editor.getMarkdown()
+            payload: newContent
           })
+          prevContent = newContent;
         })
       }
+
+      document.addEventListener('keydown', e => {
+        if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
+          editor.exec('Strike');
+          vscode.postMessage({
+            type: 'save'
+          });
+        }
+      });
     </script>
   </body>
 </html>
